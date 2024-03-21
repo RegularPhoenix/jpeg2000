@@ -1,3 +1,10 @@
+#include <bits/stdc++.h>
+#include <jp2.h>
+
+using namespace std;
+
+
 int main() {
-	return 0;
+    jp2 kek("../img/1.jp2");
+    return 0;
 }
