@@ -8,20 +8,19 @@
 #include "codestream.h"
 #include "helper.h"
 
-Box Box::read(std::ifstream &reader) {
-    Box box = Box();
-    box.reader = &reader;
+void Box::read(std::ifstream &reader) {
+    reader_ = &reader;
 
-    box.lbox = read_u32(reader);
-    if (box.lbox < 8 && box.lbox != 0 && box.lbox != 1) {
+    lbox_ = read_u32(reader);
+    if (lbox_ < 8 && lbox_ != 0 && lbox_ != 1) {
         throw std::runtime_error("A box has incorrect length!");
     }
 
-    box.tbox = read_u32(reader);
+    tbox_ = read_u32(reader);
 
-    if (box.lbox == 1) {
-        box.xlbox = read_u64(reader);
-        if (box.xlbox < 16) {
+    if (lbox_ == 1) {
+        xlbox_ = read_u64(reader);
+        if (xlbox_ < 16) {
             throw std::runtime_error("A box has incorrect length!");
         }
 
@@ -30,11 +29,10 @@ Box Box::read(std::ifstream &reader) {
         //	read_exact(box.dbox, reader, box.lbox == 0 ? reader.right : box.lbox - 8);
     }
 
-    box.dbox_start = reader.tellg();
+    dbox_.assign((lbox_ == 1 ? xlbox_ - 16 : lbox_ - 8), 0);
+    dbox_start_ = reader.tellg();
 
-    reader.seekg(box.dbox_start + (box.lbox == 1 ? box.xlbox - 16 : box.lbox - 8));
-
-    return box;
+    reader.seekg(dbox_start_ + dbox_.size());
 }
 
 // template<typename T>
@@ -60,27 +58,29 @@ T Box::unbox() {
 JP2 JP2::read(std::ifstream &reader) {
     JP2 result = JP2();
 
-    Box signature_box = Box::read(reader);
+    Box signature_box;
+    signature_box.read(reader);
 
-    if (signature_box.tbox != 0x6A501A1A || signature_box.unbox<uint32_t>() != 0x0D0A870A) {
+    if (signature_box.tbox_ != 0x6A501A1A || signature_box.unbox<uint32_t>() != 0x0D0A870A) {
         throw std::runtime_error("File signature does not match the JP2 signature!");
     }
 
     while (reader.eof()) {
-        Box current_box = Box::read(reader);
+        Box current_box;
+        current_box.read(reader);
 
-        switch (current_box.tbox) {
+        switch (current_box.tbox_) {
             case 0x7072666C:  // 'prfl'
                 result.profile_box = current_box.unbox<Profile>();
                 break;
 
             case 0x6A703263:  // 'jp2c'
-                reader.seekg(current_box.dbox_start);
-                result.codestream = Codestream::read(reader);
+                reader.seekg(current_box.dbox_start_);
+                result.codestream = Codestream(current_box.dbox_);
                 break;
 
             case 0x6A703268:  // 'jp2h'
-                reader.seekg(current_box.dbox_start);
+                reader.seekg(current_box.dbox_start_);
                 break;
 
             case 0x69686472:  // 'ihdr'
@@ -106,7 +106,7 @@ JP2 JP2::read(std::ifstream &reader) {
                 break;
         }
 
-        if (current_box.lbox == 0) {
+        if (current_box.lbox_ == 0) {
             break;
         }
     }

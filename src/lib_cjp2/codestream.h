@@ -45,9 +45,10 @@ struct Codestream {
     MainHeader main_header;
     std::vector<TilePart> tile_parts;
     Context context;
-
+   private:
+    bool read_segment(const std::vector<uint8_t>& data, size_t& byte_ind, uint16_t marker);
    public:
-    static Codestream read(std::ifstream &reader);
+    Codestream(const std::vector<uint8_t>& data);
     void ensure_context(Context context);
 };
 
@@ -111,11 +112,15 @@ struct SOT : MarkerSegment {
     uint8_t tpsot;
     uint8_t tnsot;
 
-    static void read_to_codestream(Codestream &codestream, std::ifstream &reader) {
-        uint16_t len = read_u16(reader);
+    static void read_to_codestream(Codestream &codestream, const std::vector<uint8_t>& data, size_t& byte_ind) {
+        uint16_t len = bytes_to_u16(data[byte_ind], data[byte_ind+1]);
+        byte_ind += 2;
 
-        std::vector<uint8_t> bytes;
-        read_exact(bytes, reader, len);
+        if(byte_ind + len >= data.size())
+            throw std::out_of_range("Could not read bytes: unexpected end of stream");
+        std::vector<uint8_t> bytes(data.begin() + byte_ind, data.begin() + byte_ind + len);
+        byte_ind += len;
+        // read_exact(bytes, reader, len);
 
         codestream.ensure_context(Context::TilePart);
 
@@ -152,15 +157,19 @@ struct SIZ : MarkerSegment {
     std::vector<uint8_t> xrsiz;
     std::vector<uint8_t> yrsiz;
 
-    static void read_to_codestream(Codestream &codestream, std::ifstream &reader) {
-        uint16_t len = read_u16(reader);
+    static void read_to_codestream(Codestream &codestream, const std::vector<uint8_t>& data, size_t& byte_ind) {
+        uint16_t len = bytes_to_u16(data[byte_ind], data[byte_ind+1]);
+        byte_ind += 2;
 
         if (len > 49191) {
             throw std::runtime_error("Invalid len");
         }
-
-        std::vector<uint8_t> bytes;
-        read_exact(bytes, reader, len);
+        
+        // read_exact(bytes, reader, len);
+        if(byte_ind + len >= data.size())
+            throw std::out_of_range("Could not read bytes: unexpected end of stream");
+        std::vector<uint8_t> bytes(data.begin() + byte_ind, data.begin() + byte_ind + len);
+        byte_ind += len;
 
         codestream.ensure_context(Context::MainHeader);
 

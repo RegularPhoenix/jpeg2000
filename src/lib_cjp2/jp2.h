@@ -5,15 +5,15 @@
 #include "codestream.h"
 
 struct Box {
-    uint32_t lbox;
-    uint32_t tbox;
-    uint64_t xlbox;
+    uint32_t lbox_{};
+    uint32_t tbox_{};
+    uint64_t xlbox_{};
 
-    std::ifstream *reader;
-    int dbox_start;
-    // std::vector<uint8_t> dbox;
+    int dbox_start_{};
+    std::ifstream* reader_;
+    std::vector<uint8_t> dbox_;
 
-    static Box read(std::ifstream &reader);
+    void read(std::ifstream &reader);
 
     template <typename T>
     T unbox();

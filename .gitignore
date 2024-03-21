@@ -33,3 +33,5 @@
 
 # Other
 /result
+.vscode/
+build/
