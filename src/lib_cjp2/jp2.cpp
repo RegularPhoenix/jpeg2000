@@ -42,14 +42,11 @@ void Box::read(std::ifstream &reader) {
 
 template <typename T>
 T Box::unbox() {
-    reader->seekg(dbox_start);
-
-    std::vector<uint8_t> buf;
-
+    reader->seekg(dbox_start_);
     if (lbox == 1) {
-        read_exact(buf, *reader, xlbox);
+        read_exact(dbox_, *reader, xlbox);
     } else {
-        read_exact(buf, *reader, lbox == 0 ? reader->right : lbox - 8);
+        read_exact(dbox_, *reader, lbox == 0 ? reader->right : lbox - 8);
     }
 
     return *reinterpret_cast<T *>(&buf);
