@@ -1,141 +1,187 @@
+#include <functional>
 #include <iostream>
 #include <jpeg2000/utils/dwt.hpp>
 #include <vector>
 
 namespace kimp::jpeg2000::utils {
 
-struct TA_ {
-    std::vector<std::vector<i32>> LL, HL;
-    std::vector<std::vector<i32>> LH, HH;
-};
-
-auto _1D_EXTD(const std::vector<i32>& a, ui64 i0, ui64 i1) -> std::vector<i32> {
-    std::vector<i32> result;
-
-    if (i0 % 2 == 0) {
-        if (a.size() == 1) {
-            result.push_back(a[0]);
-            result.push_back(a[0]);
-        } else if (result.size() == 2) {
-            result.push_back(a[1]);
-            result.push_back(a[0]);
-        } else {
-            result.push_back(a[1]);
-            result.push_back(a[2]);
-        }
+auto downDiv(i32 a, i32 b) -> i32 {
+    if (a >= 0) {
+        return a / b;
     } else {
-        if (a.size() == 1) {
-            result.push_back(a[0]);
+        if (a % b == 0) {
+            return a / b;
         } else {
-            result.push_back(a[1]);
+            return a / b - 1;
         }
     }
+}
 
-    for (i32 v : a) {
-        result.push_back(v);
-    }
-
-    if (i1 % 2 == 0) {
-        if (a.size() > 1) {
-            result.push_back(a[a.size() - 2]);
-        } else {
-            result.push_back(a[a.size() - 1]);
-        }
+auto upDiv(i32 a, i32 b) -> i32 {
+    if (a % b > 0) {
+        return a / b + 1;
     } else {
-        if (a.size() > 2) {
-            result.push_back(a[a.size() - 2]);
-            result.push_back(a[a.size() - 3]);
-        } else if (a.size() == 2) {
-            result.push_back(a[a.size() - 2]);
-            result.push_back(a[a.size() - 1]);
+        return a / b;
+    }
+}
+
+auto Do53DWT(const std::vector<i32>& src) -> std::vector<i32> {
+    auto x = [&] (i32 i) {
+        if (i < 0) {
+            return src.at(-i);
+        } else if (i >= src.size()) {
+            return src.at(2 * src.size() - i - 2);
         } else {
-            result.push_back(a.back());
-            result.push_back(a.back());
+            return src.at(i);
         }
-    }
+    };
 
-    return result;
-}
-
-auto _1D_FILTR(const std::vector<i32>& y, ui64 i0, ui64 i1) -> std::vector<i32> {
-    std::vector<i32> x (i1 - i0 + 1);
-
-    for (ui64 n {i0 / 2}; n < i1 / 2 + 1; n++) {
-        x[2*n] = y[2*n] - (y[2*n - 1] + y[2*n + 1] + 2) / 4;
-    }
-
-    for (ui64 n {i0 / 2}; n < i1 / 2; n++) {
-        x[2*n + 1] = y[2*n + 1] - (x[2*n] + x[2*n + 2]) / 2;
-    }
-
-    return x;
-}
-
-auto _1D_SD(const std::vector<i32>& a, ui64 i0, ui64 i1) -> std::vector<i32> {
-    auto xExt = _1D_EXTD(a, i0, i1);
-    auto yExt = _1D_FILTR(xExt, i0, i1);
-    return yExt;
-}
-
-auto _VER_SD(const std::vector<std::vector<i32>>& aLL, ui64 u0, ui64 u1, ui64 v0, ui64 v1) -> std::vector<std::vector<i32>> {
-    ui64 u = u0, i0 = v0, i1 = v1;
-
-    std::vector<std::vector<i32>> result;
-    result.reserve(u1 - u0);
-
-    while (u < u1) {
-        std::vector<i32> column;
-        column.reserve(v1 - v0);
-        for (ui64 h {v0}; h < v1; h++) {
-            column.push_back(aLL[h][u]);
+    std::function<i32(i32)> y = [&] (i32 i) {
+        if (i % 2 == 0) {
+            return x(i) + downDiv(y(i - 1) + y(i + 1) + 2, 4);
+        } else {
+            return x(i) - downDiv(x(i - 1) + x(i + 1), 2);
         }
-        result.push_back(_1D_SD(column, i0, i1));
-        u = u + 1;
-    }
+    };
     
+    std::vector<i32> result;
+    result.reserve(src.size());
+
+    for (i32 i {0}; i < src.size(); i++) {
+        result.push_back(y(i));
+    }
+
     return result;
 }
 
-auto _HOR_SD(const std::vector<std::vector<i32>>& aLL, ui64 u0, ui64 u1, ui64 v0, ui64 v1) -> std::vector<std::vector<i32>> {
-    ui64 v = v0, i0 = u0, i1 = u1;
+auto Transpone(const std::vector<std::vector<i32>>& src) -> std::vector<std::vector<i32>> {
+    std::vector<std::vector<i32>> result;
+
+    for (ui64 i {0}; i < src.at(0).size(); i++) {
+        std::vector<i32> newRow;
+        for (ui64 j {0}; j < src.size(); j++) {
+            newRow.push_back(src.at(j).at(i));
+        }
+        result.push_back(newRow);
+    }
+
+    return result;
+}
+
+auto BaseMatrixDWT(const std::vector<std::vector<i32>>& src) -> std::vector<std::vector<i32>> {
+    std::vector<std::vector<i32>> temp;
+
+    for (ui64 i {0}; i < src.at(0).size(); i++) {
+        std::vector<i32> column;
+        column.reserve(src.size());
+
+        for (const auto& row : src) {
+            column.push_back(row.at(i));
+        }
+
+        temp.push_back(Do53DWT(column));
+    }
+
+    temp = Transpone(temp);
 
     std::vector<std::vector<i32>> result;
-    result.reserve(v1 - v0);
+    for (const auto& row : temp) {
+        result.push_back(Do53DWT(row));
+    }
+    /*std::vector<std::vector<i32>> temp;
+    temp.reserve(src.size());
 
-    while (!(v >= v1)) {
-        std::vector<i32> row;
-        row.reserve(u1 - u0);
-        for (ui64 w {u0}; w < u1; w++) {
-            row.push_back(aLL[w][v]);
-        }
-        result.push_back(_1D_SD(row, i0, i1));
-        v = v + 1;
+    for (const auto& row : src) {
+        temp.push_back(Do53DWT(row));
     }
 
+
+    return Transpone(temp2);*/
     return result;
 }
 
-auto _2D_DEINTERLEAVE(const std::vector<std::vector<i32>>& a, ui64 u0, ui64 u1, ui64 v0, ui64 v1) -> TA_ {
+auto Deinterleave(const std::vector<std::vector<i32>>& src) -> TA {
+    ui64 v = src.size(), u = src.at(0).size();
 
-    return TA_{{},{},{},{}};
-}
-
-auto _2D_SD(const std::vector<std::vector<i32>>& aLL, ui64 u0, ui64 u1, ui64 v0, ui64 v1) -> TA_ {
-    auto a = _VER_SD(aLL, u0, u1, v0, v1);
-    auto b = _HOR_SD(a, u0, u1, v0, v1);
-    return TA_ {{}, {}, {}, {}};
-}
-
-auto Do53DWT(const std::vector<std::vector<i32>>& src, ui32 levels) -> void {
-    std::vector<TA_> a;
-    a.reserve(levels + 1);
-
-    a.push_back(TA_ { .LL = src, .HL = {}, .LH = {}, .HH = {} });
-
-    for (ui32 i {1}; i <= levels; i++) {
-        a.push_back(_2D_SD(a[i - 1].LL, 0, a[i - 1].LL.at(0).size(), 0, a[i - 1].LL.size()));
-        break;
+    std::vector<std::vector<i32>> ll;
+    for (ui64 vb {0}; vb < upDiv(v, 2); vb++) {
+        std::vector<i32> row;
+        for (ui64 ub {0}; ub < upDiv(u, 2); ub++) {
+            row.push_back(src.at(vb * 2).at(ub * 2));
+        }
+        ll.push_back(row);
     }
+
+    std::vector<std::vector<i32>> hl;
+    for (ui64 vb {0}; vb < upDiv(v, 2); vb++) {
+        std::vector<i32> row;
+        for (ui64 ub {0}; ub < downDiv(u, 2); ub++) {
+            row.push_back(src.at(vb * 2).at(ub * 2 + 1));
+        }
+        hl.push_back(row);
+    }
+
+    std::vector<std::vector<i32>> lh;
+    for (ui64 vb {0}; vb < downDiv(v, 2); vb++) {
+        std::vector<i32> row;
+        for (ui64 ub {0}; ub < upDiv(u, 2); ub++) {
+            row.push_back(src.at(vb * 2 + 1).at(2 * ub));
+        }
+        lh.push_back(row);
+    }
+
+    std::vector<std::vector<i32>> hh;
+    for (ui64 vb {0}; vb < downDiv(v, 2); vb++) {
+        std::vector<i32> row;
+        for (ui64 ub {0}; ub < downDiv(u, 2); ub++) {
+            row.push_back(src.at(vb * 2 + 1).at(ub * 2 + 1));
+        }
+        hh.push_back(row);
+    }
+
+    return TA { .LL = ll, .HL = hl, .LH = lh, .HH = hh};
+}
+
+auto Do53DWT(const std::vector<std::vector<i32>>& src, ui32 levels) -> std::vector<TA> {
+    std::vector<TA> result;
+    result.push_back(TA { .LL = src, .HL = {}, .LH = {}, .HH = {} });
+
+    for (ui64 i {1}; i <= levels; i++) {
+        result.push_back(Deinterleave(BaseMatrixDWT(result.at(i - 1).LL)));
+    }
+
+    return result;
+    //return Deinterleave(BaseMatrixDWT(src));
+//    return TA{ {}, {}, {}, {} };
+}
+
+auto Undo53DWT(const std::vector<i32>& src) -> std::vector<i32> {
+    auto y = [&] (i32 i) {
+        if (i < 0) {
+            return src.at(-i);
+        } else if (i >= src.size()) {
+            return src.at(2 * src.size() - i - 2);
+        } else {
+            return src.at(i);
+        }
+    };
+
+    std::function<i32(i32)> x = [&] (i32 i) {
+        if (i % 2 == 0) {
+            return y(i) - downDiv(y(i - 1) + y(i + 1) + 2, 4);
+        } else {
+            return y(i) + downDiv(x(i - 1) + x(i + 1), 2);
+        }
+    };
+
+    std::vector<i32> result;
+    result.reserve(src.size());
+
+    for (i32 i {0}; i < src.size(); i++) {
+        result.push_back(x(i));
+    }
+
+    return result;
 }
 
 } // namespace kimp::jpeg2000::utils

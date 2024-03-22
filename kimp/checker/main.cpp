@@ -26,7 +26,7 @@ auto main(int argc, char ** argv) -> int {
     //    .Build()
     //    .Encode(test);    
 
-    utils::Do53DWT({
+    auto m = utils::Do53DWT({
         {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
         {1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
         {2, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
@@ -44,7 +44,14 @@ auto main(int argc, char ** argv) -> int {
         {14,14,14,14,14,14,15,15,16,16,17,17,18},
         {15,15,15,15,15,15,16,16,17,17,18,18,19},
         {16,16,16,16,16,16,17,17,17,18,18,19,20}
-    }, 2);
+    }, 2).at(2).LL;
+
+    for (const auto& a : m) {
+        for (const auto& b : a) {
+            std::cout << b << " ";
+        }
+        std::cout << std::endl;
+    }
 
     return 0;
 }
