@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include <jpeg2000/utils/num.hpp>
+#include <vector>
 
 namespace kimp::jpeg2000::jp2 {
 
@@ -30,6 +32,98 @@ enum EJP2MarkerType : ui16 {
 
     CRG = 0xff61, // Component registration
     COM = 0xff64, // Comment
+};
+
+class MarkerSegment {
+public:
+    bool is_initialized;
+};
+
+class Siz : public MarkerSegment {
+public:
+    Siz(std::vector<uint8_t>);
+    Siz();
+
+    uint16_t lsiz;
+    uint16_t rsiz;
+    uint32_t xsiz;
+    uint32_t ysiz;
+    uint32_t xosiz;
+    uint32_t yosiz;
+    uint32_t xtsiz;
+    uint32_t ytsiz;
+    uint32_t xtosiz;
+    uint32_t ytosiz;
+    uint16_t csiz;
+    std::vector<uint8_t> ssiz;
+    std::vector<uint8_t> xrsiz;
+    std::vector<uint8_t> yrsiz;
+
+    void write(std::vector<uint8_t>&);
+};
+
+class Sot : public MarkerSegment {
+public:
+    Sot(std::vector<ui8>);
+    Sot();
+
+    uint16_t lsot;
+    uint16_t isot;
+    uint32_t psot;
+    uint8_t tpsot;
+    uint8_t tnsot;
+
+    void write(std::vector<uint8_t>&);
+};
+
+class Cod : public MarkerSegment {
+public:
+    Cod(std::vector<ui8>);
+    Cod();
+
+    uint16_t lcod;
+    uint8_t scod;
+    std::vector<uint8_t> spcod;
+
+    void write(std::vector<uint8_t>&);
+};
+
+class Qcd : public MarkerSegment {
+public:
+    Qcd(std::vector<ui8>);
+    Qcd();
+
+    uint16_t lqcd;
+    uint8_t sqcd;
+    std::vector<uint8_t> spqcd;
+
+    void write(std::vector<uint8_t>&);
+};
+
+enum DecodeContext {
+    DecodeMainHeader,
+    DecodeTilePartHeader,
+};
+
+struct MainHeader {
+    Siz siz;
+    Cod cod;
+    Qcd qcd;
+};
+
+class TilePart {
+public:
+    Sot sot;
+    std::vector<ui8> bit_stream;
+};
+
+class Codestream {
+    Codestream(std::vector<ui8>);
+    auto write() -> std::vector<uint8_t>;
+
+    MainHeader main_header;
+    std::vector<TilePart> tile_parts;
+    DecodeContext current_context;
 };
 
 } // namespace kimp::jpeg2000::jp2
