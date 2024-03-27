@@ -1,4 +1,6 @@
 #include <cstdint>
+#include <ios>
+#include <iostream>
 #include <jpeg2000/jp2/codestream.hpp>
 #include <stdexcept>
 #include <tuple>
@@ -7,7 +9,7 @@
 namespace kimp::jpeg2000::jp2 {
 
 uint16_t bytes_to_u16(uint8_t a, uint8_t b) {
-    return (a << 8) & b;
+    return (static_cast<ui16>(a) << 8) | static_cast<ui16>(b);
 }
 
 std::vector<uint8_t> u16_to_bytes(uint16_t i) {
@@ -15,7 +17,7 @@ std::vector<uint8_t> u16_to_bytes(uint16_t i) {
 }
 
 uint32_t bytes_to_u32(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
-    return (a << 24) & (b << 16) & (c << 8) & d;
+    return (static_cast<ui32>(a) << 24) | (static_cast<ui32>(b) << 16) | (static_cast<ui32>(c) << 8) | d;
 }
 
 std::vector<uint8_t> u32_to_bytes(uint32_t i) {
@@ -34,24 +36,25 @@ Siz::Siz(std::vector<uint8_t> bytes) {
     }
 
     lsiz = len;
-    rsiz = bytes_to_u32(bytes[2], bytes[3], bytes[4], bytes[5]);
-    xsiz = bytes_to_u32(bytes[6], bytes[7], bytes[8], bytes[9]);
-    ysiz = bytes_to_u32(bytes[10], bytes[11], bytes[12], bytes[13]);
-    xosiz = bytes_to_u32(bytes[14], bytes[15], bytes[16], bytes[17]);
-    yosiz = bytes_to_u32(bytes[18], bytes[19], bytes[20], bytes[21]);
-    xtsiz = bytes_to_u32(bytes[22], bytes[23], bytes[24], bytes[25]);
-    ytsiz = bytes_to_u32(bytes[26], bytes[27], bytes[28], bytes[29]);
-    xtosiz = bytes_to_u32(bytes[30], bytes[31], bytes[32], bytes[33]);
-    ytosiz = bytes_to_u16(bytes[34], bytes[35]);
+    rsiz = bytes_to_u16(bytes[2], bytes[3]);
+    xsiz = bytes_to_u32(bytes[4], bytes[5], bytes[6], bytes[7]);
+    ysiz = bytes_to_u32(bytes[8], bytes[9], bytes[10], bytes[11]);
+    xosiz = bytes_to_u32(bytes[12], bytes[13], bytes[14], bytes[15]);
+    yosiz = bytes_to_u32(bytes[16], bytes[17], bytes[18], bytes[19]);
+    xtsiz = bytes_to_u32(bytes[20], bytes[21], bytes[22], bytes[23]);
+    ytsiz = bytes_to_u32(bytes[24], bytes[25], bytes[26], bytes[27]);
+    xtosiz = bytes_to_u32(bytes[28], bytes[29], bytes[30], bytes[31]);
+    ytosiz = bytes_to_u32(bytes[32], bytes[33], bytes[34], bytes[35]);
+    csiz = bytes_to_u16(bytes[36], bytes[37]);
     ssiz = std::vector<uint8_t>();
     xrsiz = std::vector<uint8_t>();
     yrsiz = std::vector<uint8_t>();
 
-    auto st_index = 36;
-    for (int i = 0; i < (len - 36); i += 3) {
-        ssiz.push_back(bytes[st_index + i]);
-        xrsiz.push_back(bytes[st_index + i + 1]);
-        yrsiz.push_back(bytes[st_index + i + 2]);
+    auto st_index = 38;
+    for (int i = 0; i < csiz; i++) {
+        ssiz.push_back(bytes[st_index + i * 3]);
+        xrsiz.push_back(bytes[st_index + i * 3 + 1]);
+        yrsiz.push_back(bytes[st_index + i * 3 + 2]);
     }
 }
 
@@ -134,7 +137,7 @@ auto read_marker(std::vector<uint8_t> & bytes, int & index) -> uint16_t {
 
 auto read_segment(std::vector<uint8_t> & bytes, int & index) -> std::tuple<uint16_t, uint16_t> {
     uint16_t marker = read_marker(bytes, index);
-    uint16_t len = bytes_to_u16(bytes.at(index + 1), bytes.at(index + 2));
+    uint16_t len = bytes_to_u16(bytes.at(index++), bytes.at(index++));
     return { marker, len };
 }
 
@@ -148,8 +151,11 @@ Codestream::Codestream(std::vector<uint8_t> bytes) {
         auto t = read_segment(bytes, index);
         std::vector<uint8_t> buf;
 
+
+        std::cout << "Segment " << std::hex << std::get<0>(t) << " with " << std::dec << std::get<1>(t) << " size" << std::endl;
+
         auto len = std::get<1>(t);
-        buf.assign(bytes.begin() + index, bytes.begin() + index + len);
+        buf.assign(bytes.begin() + index - 2, bytes.begin() + index + len);
 
         switch (std::get<0>(t)) {
             case EJP2MarkerType::SIZ:
@@ -189,7 +195,7 @@ Codestream::Codestream(std::vector<uint8_t> bytes) {
                 break;
         }
 
-        index += len;
+        index += len - 2;
     }
 
     FIN:

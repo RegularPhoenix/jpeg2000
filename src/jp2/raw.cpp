@@ -1,3 +1,4 @@
+#include "jpeg2000/utils/logging.hpp"
 #include <jpeg2000/jp2/raw.hpp>
 
 namespace kimp::jpeg2000::jp2 {
@@ -8,6 +9,17 @@ TRawJP2Box::TRawJP2Box()
     , BoxType_{0}
     , BoxContent_{nullptr}
     {}
+
+TRawJP2Box::TRawJP2Box(EJP2BoxType type, const std::vector<ui8>& content)
+    : utils::TWithLogging(this)
+    , BoxContentSize_{content.size()}
+    , BoxType_{static_cast<ui32>(type)}
+    , BoxContent_{new ui8 [content.size()]}
+{
+    for (ui64 i {0}; i < BoxContentSize_; i++) {
+        BoxContent_[i] = content.at(i);
+    }
+}
 
 auto TRawJP2Box::GetContentSize() const -> ui64 {
     return BoxContentSize_;

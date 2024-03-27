@@ -68,6 +68,7 @@ auto Transpone(const std::vector<std::vector<i32>>& src) -> std::vector<std::vec
     return result;
 }
 
+
 auto BaseMatrixDWT(const std::vector<std::vector<i32>>& src) -> std::vector<std::vector<i32>> {
     std::vector<std::vector<i32>> temp;
 
@@ -88,15 +89,6 @@ auto BaseMatrixDWT(const std::vector<std::vector<i32>>& src) -> std::vector<std:
     for (const auto& row : temp) {
         result.push_back(Do53DWT(row));
     }
-    /*std::vector<std::vector<i32>> temp;
-    temp.reserve(src.size());
-
-    for (const auto& row : src) {
-        temp.push_back(Do53DWT(row));
-    }
-
-
-    return Transpone(temp2);*/
     return result;
 }
 
@@ -142,6 +134,47 @@ auto Deinterleave(const std::vector<std::vector<i32>>& src) -> TA {
     return TA { .LL = ll, .HL = hl, .LH = lh, .HH = hh};
 }
 
+
+auto Union(const TA& ta) -> std::vector<std::vector<i32>> {
+    std::vector<std::vector<i32>> result;
+
+    for (ui64 i {0}; i < ta.LL.size(); i++) {
+        std::vector<i32> row;
+        for (auto e : ta.LL.at(i)) {
+            row.push_back(e);
+        }
+        for (auto e : ta.HL.at(i)) {
+            row.push_back(e);
+        }
+        result.push_back(row);
+    }
+
+    for (ui64 i {0}; i < ta.HH.size(); i++) {
+        std::vector<i32> row;
+        for (auto e : ta.LH.at(i)) {
+            row.push_back(e);
+        }
+        for (auto e : ta.HH.at(i)) {
+            row.push_back(e);
+        }
+        result.push_back(row);
+    }
+
+    return result;
+}
+
+auto Union(const std::vector<TA>& d) -> std::vector<std::vector<i32>> {
+    std::vector<std::vector<i32>> combined = d.back().LL;
+
+    for (ui64 i {d.size() - 1}; i > 0; i--) {
+        TA current = d.at(i);
+        combined = Union(TA { .LL = combined, .HL = current.HL, .LH = current.LH, .HH = current.HH });
+    }
+
+    return combined;
+
+}
+
 auto Do53DWT(const std::vector<std::vector<i32>>& src, ui32 levels) -> std::vector<TA> {
     std::vector<TA> result;
     result.push_back(TA { .LL = src, .HL = {}, .LH = {}, .HH = {} });
@@ -151,8 +184,6 @@ auto Do53DWT(const std::vector<std::vector<i32>>& src, ui32 levels) -> std::vect
     }
 
     return result;
-    //return Deinterleave(BaseMatrixDWT(src));
-//    return TA{ {}, {}, {}, {} };
 }
 
 auto Undo53DWT(const std::vector<i32>& src) -> std::vector<i32> {
@@ -182,6 +213,98 @@ auto Undo53DWT(const std::vector<i32>& src) -> std::vector<i32> {
     }
 
     return result;
+}
+
+auto Interleave(const TA& t) -> std::vector<std::vector<i32>> {
+    ui64 u = t.HL.at(0).size() + t.LH.at(0).size();
+    ui64 v = t.LL.size() + t.HH.size();
+
+    std::vector<std::vector<i32>> result;
+    for (ui64 i {0}; i < v; i++) {
+        std::vector<i32> row;
+        for (ui64 j {0}; j < u; j++) {
+            row.push_back(0);
+        }
+        result.push_back(row);
+    }
+
+    for (ui64 vb {0}; vb < upDiv(v, 2); vb++) {
+        for (ui64 ub {0}; ub < upDiv(u, 2); ub++) {
+            result[2 * vb][2 * ub] = t.LL[vb][ub];
+        }
+    }
+
+    for (ui64 vb {0}; vb < upDiv(v, 2); vb++) {
+        for (ui64 ub {0}; ub < downDiv(u, 2); ub++) {
+            result[2 * vb][2 * ub + 1] = t.HL[vb][ub];
+        }
+    }
+
+    for (ui64 vb {0}; vb < downDiv(v, 2); vb++) {
+        for (ui64 ub {0}; ub < upDiv(u, 2); ub++) {
+            result[2 * vb + 1][2 * ub] = t.LH[vb][ub];
+        }
+    }
+
+    for (ui64 vb {0}; vb < downDiv(v, 2); vb++) {
+        for (ui64 ub {0}; ub < downDiv(u, 2); ub++) {
+            result[2 * vb + 1][2 * ub + 1] = t.HH[vb][ub];
+        }
+    }
+
+    return result;
+}
+
+auto BaseMatrixIDWT(const std::vector<std::vector<i32>>& src) -> std::vector<std::vector<i32>> {
+    std::vector<std::vector<i32>> temp;
+
+    for (const auto& row : src) {
+        temp.push_back(Undo53DWT(row));
+    }
+
+    std::vector<std::vector<i32>> result;
+
+    for (ui64 i {0}; i < temp.at(0).size(); i++) {
+        std::vector<i32> column;
+        column.reserve(temp.size());
+
+        for (const auto& r: temp) {
+            column.push_back(r.at(i));
+        }
+
+        result.push_back(Undo53DWT(column));
+    }
+
+    return Transpone(result);
+
+    /*for (ui64 i {0}; i < src.at(0).size(); i++) {
+        std::vector<i32> column;
+        column.reserve(src.size());
+
+        for (const auto& row : src) {
+            column.push_back(row.at(i));
+        }
+
+        temp.push_back(Do53DWT(column));
+    }
+
+    temp = Transpone(temp);
+
+    std::vector<std::vector<i32>> result;
+    for (const auto& row : temp) {
+        result.push_back(Do53DWT(row));
+    }
+    return result;*/
+}
+
+auto Undo53DWT(const std::vector<TA>& src) -> std::vector<std::vector<i32>> {
+    std::vector<std::vector<i32>> ll = BaseMatrixIDWT(Interleave(src.back()));
+    for (ui64 i {src.size() - 2}; i > 0; i--) {
+        ll = BaseMatrixIDWT(Interleave(
+            TA {.LL = ll, .HL = src[i].HL, .LH = src[i].LH, .HH = src[i].HH}
+        ));
+    }
+    return ll;// BaseMatrixIDWT(Interleave(src.back()));
 }
 
 } // namespace kimp::jpeg2000::utils
