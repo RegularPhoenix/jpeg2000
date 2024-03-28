@@ -24,6 +24,7 @@ abstract class TJP2Box {
 public:
     TJP2Box(EJP2BoxType);
     auto GetType() const -> EJP2BoxType;
+    virtual std::string ToString() const = 0;
     virtual ~TJP2Box();
 private:
     const EJP2BoxType BoxType_;
@@ -35,6 +36,8 @@ public:
 
     auto GetSignature() const -> ui32;
     auto IsSignatureValid() const -> bool;
+
+    virtual std::string ToString() const override;
 
     virtual ~TSignatureJP2Box();
 
@@ -55,6 +58,8 @@ public:
 
     auto IsJPEG2000() const -> bool;
 
+    virtual std::string ToString() const override;
+
     virtual ~TFileTypeJP2Box();
 
 public:
@@ -68,9 +73,16 @@ private:
 
 class THeaderContainerJP2Box : public TJP2Box {
 public:
-    THeaderContainerJP2Box();
+    THeaderContainerJP2Box(const std::vector<std::shared_ptr<TJP2Box>>& children);
 
-    virtual ~THeaderContainerJP2Box(); 
+    auto GetChildren() const -> const std::vector<std::shared_ptr<TJP2Box>>&;
+
+    virtual std::string ToString() const override;
+
+    virtual ~THeaderContainerJP2Box();
+
+private:
+    const std::vector<std::shared_ptr<TJP2Box>> Children_;
 };
 
 class TImageHeaderJP2Box : public TJP2Box {
@@ -86,6 +98,8 @@ public:
     auto IsIntellectualProperty() const -> bool;
 
     auto IsJPEG2000() const -> bool;
+
+    virtual std::string ToString() const override;
 
     virtual ~TImageHeaderJP2Box();
 
@@ -108,6 +122,8 @@ public:
 
     auto GetXmlDoc() const -> const pugi::xml_document&;
 
+    virtual std::string ToString() const override;
+
     virtual ~TXmlJP2Box();
 
 private:
@@ -124,6 +140,8 @@ public:
     auto GetEnumeratedColorSpace() const -> std::optional<ui32>;
     auto GetICCProfile() const -> std::optional<std::vector<ui8>>;
 
+    virtual std::string ToString() const override;
+
     virtual ~TColorSpecificationJP2Box();
 
 private:
@@ -139,6 +157,8 @@ public:
     TCodeStreamJP2Box(const std::vector<ui8>& data);
 
     auto GetCode() const -> const std::vector<ui8>&;
+
+    virtual std::string ToString() const override;
 
     virtual ~TCodeStreamJP2Box();
 

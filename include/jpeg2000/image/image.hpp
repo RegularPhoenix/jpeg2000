@@ -48,11 +48,11 @@ public:
 
     friend auto operator<<(std::ostream& out, const TImage<Pixel>& img) -> std::ostream& {
         for (ui64 i {0}; i < img.GetHeight(); i++) {
-            out << "[";
             for (ui64 j {0}; j < img.GetWidth(); j++) {
-                out << " " << img.GetPixel(j, i);
+                out << img.GetPixel(j, i);
+                if (j + 1 != img.GetWidth()) out << " ";
             }
-            out << " ]" << std::endl << std::flush;
+            out <<  std::endl << std::flush;
         }
         return out;
     }

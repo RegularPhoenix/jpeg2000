@@ -118,6 +118,7 @@ public:
 };
 
 class Codestream {
+public:
     Codestream(std::vector<ui8>);
     auto write() -> std::vector<uint8_t>;
 
